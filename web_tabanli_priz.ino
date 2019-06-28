@@ -1,6 +1,6 @@
 #include <ESP8266WiFi.h>
 
-
+const int fotoresistor = A0;
 const char* wifi_ad = "********";   // Wifi adı ve şifresini 
 const char* wifi_sifre = "*******"; // değiştiriniz.
 
@@ -14,6 +14,7 @@ WiFiServer server(80);
 
 void setup() {
   Serial.begin(115200);
+  pinMode(pResistor, INPUT);
   pinMode(lamba, OUTPUT);
   digitalWrite(lamba, LOW);
   Serial.print(wifi_ad);
@@ -55,7 +56,7 @@ void loop(){
               lamba_durumu = "açık";
               digitalWrite(lamba, HIGH);
             } else if (header.indexOf("GET /lamba/kapat") >= 0) {
-              Serial.println("lamba off");
+              Serial.println("Röle aktif değil.");
               lamba_durumu = "kapalı";
               digitalWrite(lamba, LOW);
             } 
@@ -84,6 +85,12 @@ void loop(){
             client.println();
             break;
           } else { 
+            if (analogRead(fotoresistor)> 25){
+              if(lamba_durumu == "kapalı"){
+                lamba_durumu = "açık";
+                digitalWrite(lamba, HIGH);
+              }
+            }
             kullanici_girdisi = "";
           }
         } else if (c != '\r') {  
