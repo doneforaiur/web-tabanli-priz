@@ -14,7 +14,7 @@ WiFiServer server(80);
 
 void setup() {
   Serial.begin(115200);
-  pinMode(pResistor, INPUT);
+  pinMode(fotoresistor, INPUT);
   pinMode(lamba, OUTPUT);
   digitalWrite(lamba, LOW);
   Serial.print(wifi_ad);
