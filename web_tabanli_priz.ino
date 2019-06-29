@@ -1,12 +1,12 @@
 #include <ESP8266WiFi.h>
+#define lamba 2
 
-const int fotoresistor = A0;
-const char* wifi_ad = "********";   // Wifi adı ve şifresini 
+const char* wifi_ad = "*******";   // Wifi adı ve şifresini 
 const char* wifi_sifre = "*******"; // değiştiriniz.
 
 String header; // HTTP isteğini saklamak için
-String lamba_durumu = "kapalı";
-const int lamba = D0;
+String lamba_durumu = "kapali";
+
 
 WiFiServer server(80);
 // 80 portu Skype gibi uygulamalar tarafından kullanıldığı için
@@ -14,7 +14,6 @@ WiFiServer server(80);
 
 void setup() {
   Serial.begin(115200);
-  pinMode(fotoresistor, INPUT);
   pinMode(lamba, OUTPUT);
   digitalWrite(lamba, LOW);
   Serial.print(wifi_ad);
@@ -22,8 +21,9 @@ void setup() {
   
   WiFi.begin(wifi_ad, wifi_sifre);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+    delay(1000);
+    Serial.println(WiFi.status());
+    // Hata kodu 4 yanlış şifre girildiğini belirtir.
   }
   Serial.println("Bağlandı.");
   Serial.println("Web serverin yerel IP'si;");
@@ -53,44 +53,34 @@ void loop(){
 
             if (header.indexOf("GET /lamba/ac") >= 0) {
               Serial.println("Röle aktif.");
-              lamba_durumu = "açık";
-              digitalWrite(lamba, HIGH);
+              lamba_durumu = "acik";
+              digitalWrite(lamba, LOW);
             } else if (header.indexOf("GET /lamba/kapat") >= 0) {
               Serial.println("Röle aktif değil.");
-              lamba_durumu = "kapalı";
-              digitalWrite(lamba, LOW);
+              lamba_durumu = "kapali";
+              digitalWrite(lamba, HIGH);
             } 
             
             // Sayfayı görüntülemek için HTML kodu
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
-            client.println("<style>html { font-family: Cairo; display: inline; margin: 0px auto; text-align: center; background-color: #ccffb3;}");
+            client.println("<style>html { font-family: Cairo; display: inline; margin: 0px auto; text-align: center; background-color: #FFFFFF;}");
             client.println(".button { background-color: #006699; border: none; color: white; padding: 16px 40px;");
             client.println("text-decoration: none; font-size: 35px; margin: 2px; cursor: pointer;}");
             client.println(".button2 {background-color: #555555;}</style></head>");
-        
-            client.println("<svg width=\"300\" height=\"80\"><text fill=\"#00bfbf\" font-family=\"serif\" font-size=\"24\" id=\"svg_1\" stroke=\"#000000\" text-anchor=\"middle\" transform=\"matrix(1.35388 0 0 1.42308 -6.66283 -8.67308)\" x=\"86.5\" xml:space=\"preserve\" y=\"41.5\">Circuit Digest</text></svg>");
-          
+                 
             // Heading kısmı
             client.println("<p>Lamba durumu;" + lamba_durumu + "</p>");   
-            if (lamba_durumu=="kapalı") {
-              client.println("<p><a href=\"/lamba/ac\"><button class=\"button\">AÇ</button></a></p>");
-              client.println("<svg width=\"500\" height=\"300\"><ellipse cx=\"258.5\" cy=\"125.5\" fill=\"#ffffff\" rx=\"47\" ry=\"52\" stroke=\"#ffffaa\" stroke-width=\"5\"/><rect fill=\"#cccccc\" height=\"40\" stroke=\"#ffffaa\" stroke-width=\"5\" transform=\"rotate(-0.485546 261 187.5)\" width=\"39\" x=\"241.5\" y=\"167.5\"/></svg>");
+            if (lamba_durumu=="kapali") {
+              client.println("<p><a href=\"/lamba/ac\"><button class=\"button\">Ac</button></a></p>");
             } else {
               client.println("<p><a href=\"/lamba/kapat\"><button class=\"button button2\">KAPAT</button></a></p>");
-              client.println("<svg width=\"500\" height=\"300\"><ellipse cx=\"258.5\" cy=\"125.5\" fill=\"#ff7f00\" rx=\"47\" ry=\"52\" stroke=\"#ffffaa\" stroke-width=\"5\"/><rect fill=\"#cccccc\" height=\"40\" stroke=\"#ffffaa\" stroke-width=\"5\" transform=\"rotate(-0.485546 261 187.5)\" width=\"39\" x=\"241.5\" y=\"167.5\"/></svg>");
             }     
             client.println("</body></html>");
             client.println();
             break;
           } else { 
-            if (analogRead(fotoresistor)> 25){
-              if(lamba_durumu == "kapalı"){
-                lamba_durumu = "açık";
-                digitalWrite(lamba, HIGH);
-              }
-            }
             kullanici_girdisi = "";
           }
         } else if (c != '\r') {  
