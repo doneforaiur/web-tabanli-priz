@@ -1,12 +1,23 @@
 #include <ESP8266WiFi.h>
-#define lamba 2
+#include <ESP8266HTTPClient.h>
+#include <ArduinoJson.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include <WiFiClient.h>
+
+#define lamba 14
 
 const char* wifi_ad = "*******";   // Wifi adı ve şifresini 
-const char* wifi_sifre = "*******"; // değiştiriniz.
+const char* wifi_sifre = "*********"; // değiştiriniz.
+
 
 String header; // HTTP isteğini saklamak için
-String lamba_durumu = "kapali";
+int lamba_durumu = LOW;
+int otomatik = LOW;
+WiFiUDP ntpUDP;
 
+const long utcOffsetInSeconds = 10800;   
+NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds); 
 
 WiFiServer server(80);
 // 80 portu Skype gibi uygulamalar tarafından kullanıldığı için
@@ -15,7 +26,8 @@ WiFiServer server(80);
 void setup() {
   Serial.begin(115200);
   pinMode(lamba, OUTPUT);
-  digitalWrite(lamba, LOW);
+  digitalWrite(lamba, HIGH);
+  
   Serial.print(wifi_ad);
   Serial.println("'na bağlanılıyor.");
   
@@ -33,62 +45,72 @@ void setup() {
 
   Serial.println(WiFi.localIP());
   server.begin();
+  timeClient.begin();
+
 }
+const long interval = 10; 
+unsigned long previousMillis = 0;   
+
+const size_t capacity = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(10) + 621;
+DynamicJsonDocument doc(capacity);
 
 void loop(){
-  WiFiClient client = server.available();   
-  if (client) {                                
-    String kullanici_girdisi = "";
-    while (client.connected())
-      if (client.available()) {      // Kullanici bilgi aktariyorsa
-        char c = client.read();             
-        Serial.write(c);                    
-        header += c;
-        if (c == '\n') {                    // Aktarilan bilgi yeni satır karakteriyse
-          if (kullanici_girdisi.length() == 0) {
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
 
-            if (header.indexOf("GET /lamba/ac") >= 0) {
-              Serial.println("Röle aktif.");
-              lamba_durumu = "acik";
-              digitalWrite(lamba, LOW);
-            } else if (header.indexOf("GET /lamba/kapat") >= 0) {
-              Serial.println("Röle aktif değil.");
-              lamba_durumu = "kapali";
-              digitalWrite(lamba, HIGH);
-            } 
-            
-            // Sayfayı görüntülemek için HTML kodu
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-            client.println("<style>html { font-family: Cairo; display: inline; margin: 0px auto; text-align: center; background-color: #FFFFFF;}");
-            client.println(".button { background-color: #006699; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 35px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #555555;}</style></head>");
-                 
-            // Heading kısmı
-            client.println("<p>Lamba durumu;" + lamba_durumu + "</p>");   
-            if (lamba_durumu=="kapali") {
-              client.println("<p><a href=\"/lamba/ac\"><button class=\"button\">Ac</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/lamba/kapat\"><button class=\"button button2\">KAPAT</button></a></p>");
-            }     
-            client.println("</body></html>");
-            client.println();
-            break;
-          } else { 
-            kullanici_girdisi = "";
-          }
-        } else if (c != '\r') {  
-          kullanici_girdisi += c;
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    timeClient.update();
+    String current_time = timeClient.getFormattedTime();
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http; 
+      http.begin("http://api.sunrise-sunset.org/json?lat=39.925533&lng=-32.866287&date=today&formatted=0"); // Ankara
+      int httpCode = http.GET();
+      String http1 = http.getString();
+      deserializeJson(doc, http1);                                      
+      if (httpCode > 0) {
+  
+        JsonObject results = doc["results"];
+        String results_sunset = results["sunset"];
+        String sunset_time = results_sunset.substring(results_sunset.indexOf('T')+1,results_sunset.indexOf('+'));
+        
+        Serial.println(sunset_time);
+        Serial.println(current_time);
+        if(otomatik==HIGH && lamba_durumu == LOW && sunset_time < current_time){
+          lamba_durumu = HIGH;
+          digitalWrite(lamba, LOW);
         }
       }
+      http.end(); 
     }
-    header = "";
-    client.stop();
   }
+
+    
+  
+  WiFiClient client = server.available();   
+
+  if(client.available()){
+  String request = client.readStringUntil('\r');
+  Serial.println(request);
+  client.flush();
+  int lamba_durumu = LOW;
+  if (request.indexOf("/lamba/ac") != -1)  {
+    digitalWrite(lamba, LOW);
+    lamba_durumu = HIGH;
+  }
+  if (request.indexOf("/lamba/kapat") != -1)  {
+    digitalWrite(lamba, HIGH);
+    lamba_durumu = LOW;
+  }
+  int otomatik = LOW;
+  if (request.indexOf("/otomatik/ac") != -1)  {
+    otomatik = HIGH;
+  }
+  if (request.indexOf("/otomatik/kapat") != -1)  {
+    otomatik = LOW;
+  }
+   client.println("HTTP/1.1 200 OK");
+   client.println(""); 
+   delay(1);
+  }
+}
 
