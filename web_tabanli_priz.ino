@@ -8,7 +8,7 @@
 #define lamba 14
 
 
-const char* wifi_ad = "*********";   // Wifi adı ve şifresini 
+const char* wifi_ad = "********";   // Wifi adı ve şifresini 
 const char* wifi_sifre = "********"; // değiştiriniz.
 
 
@@ -32,12 +32,21 @@ void reply_state(WiFiClient client,int lamba_durumu, int otomatik) {
   otomatik_ = (otomatik == 1) ? "acik" : "kapali";
 
   String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnnection: close\r\n\r\n<!DOCTYPE HTML><html>";
-  s +="<font size=\"8\">Lamba suan; "+lamba_;
+  s +="<center><font size=\"8\">Lamba suan; "+lamba_;
   if(lamba_ == "acik")
-    s+= "<br><a href=\"/lamba/kapat\"\">KAPAT</a></html>";
+    s+= " <b><a href=\"/lamba/kapat\"\">KAPAT</a></b>";
   else
-    s+= "<br><a href=\"/lamba/ac\"\">AC</a></html>";
-  s+="</font>";
+    s+= " <b><a href=\"/lamba/ac\"\">AC</a></b>";
+  s+="<br>Otomatik suan; " + otomatik_;
+  if(otomatik_ == "acik")
+    s+= " <b><a href=\"/otomatik/kapat\"\">KAPAT</a></b>";
+  else
+    s+= " <b><a href=\"/otomatik/ac\"\">AC</a></b>";
+  
+  
+  
+  s+="</html></font>";
+  
   Serial.println(lamba_durumu);
   client.print(s);
   client.flush();
@@ -71,7 +80,7 @@ void setup() {
   timeClient.begin();
 
 }
-const long interval =  500; 
+const long interval =  2000; 
 unsigned long previousMillis = 0;   
 
 const size_t capacity = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(10) + 621;
