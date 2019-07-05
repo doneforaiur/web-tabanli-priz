@@ -8,8 +8,8 @@
 #define lamba 14
 
 
-const char* wifi_ad = "VodafoneNet-VHU2PP";   // Wifi adı ve şifresini 
-const char* wifi_sifre = "432111ma"; // değiştiriniz.
+const char* wifi_ad = "*********";   // Wifi adı ve şifresini 
+const char* wifi_sifre = "********"; // değiştiriniz.
 
 
 String header; // HTTP isteğini saklamak için
@@ -32,7 +32,7 @@ void reply_state(WiFiClient client,int lamba_durumu, int otomatik) {
   otomatik_ = (otomatik == 1) ? "acik" : "kapali";
 
   String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnnection: close\r\n\r\n<!DOCTYPE HTML><html>";
-  s +="<font size=\"5\">Lamba suan; "+lamba_;
+  s +="<font size=\"8\">Lamba suan; "+lamba_;
   if(lamba_ == "acik")
     s+= "<br><a href=\"/lamba/kapat\"\">KAPAT</a></html>";
   else
@@ -105,8 +105,6 @@ void loop(){
     }
   }
 
-    
-  
   WiFiClient client = server.available();   
 
   if(client.available()){
@@ -117,19 +115,18 @@ void loop(){
       digitalWrite(lamba, LOW);
       lamba_durumu = HIGH;
     }
+    
     if (request.indexOf("/lamba/kapat") != -1)  {
       digitalWrite(lamba, HIGH);
       lamba_durumu = LOW;
     }
+    
     int otomatik = LOW;
-    if (request.indexOf("/otomatik/ac") != -1)  {
+    if (request.indexOf("/otomatik/ac") != -1)
       otomatik = HIGH;
-    }
-    if (request.indexOf("/otomatik/kapat") != -1)  {
+    if (request.indexOf("/otomatik/kapat") != -1)
       otomatik = LOW;
-    }
      reply_state(client,lamba_durumu,otomatik);
     }
-
 }
 
