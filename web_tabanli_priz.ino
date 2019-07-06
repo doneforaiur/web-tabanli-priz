@@ -5,16 +5,19 @@
 #include <WiFiUdp.h>
 #include <WiFiClient.h>
 
+
 #define lamba 14
 
 
 const char* wifi_ad = "********";   // Wifi adı ve şifresini 
 const char* wifi_sifre = "********"; // değiştiriniz.
 
+const size_t capacity = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(10) + 621;
+DynamicJsonDocument doc(capacity);
 
 String header; // HTTP isteğini saklamak için
 int lamba_durumu = LOW;
-int otomatik = LOW;
+int otomatik = HIGH;
 WiFiUDP ntpUDP;
 
 const long utcOffsetInSeconds = 10800;   
@@ -32,7 +35,8 @@ void reply_state(WiFiClient client,int lamba_durumu, int otomatik) {
   otomatik_ = (otomatik == 1) ? "acik" : "kapali";
 
   String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnnection: close\r\n\r\n<!DOCTYPE HTML><html>";
-  s +="<center><font size=\"8\">Lamba suan; "+lamba_;
+  s +="<link rel=\"icon\" href=\"data:,\">"; // Gereksiz GET favicon.ico isteklerini engellemek için
+  s += "<center><font size=\"8\">Lamba suan; "+lamba_;
   if(lamba_ == "acik")
     s+= " <b><a href=\"/lamba/kapat\"\">KAPAT</a></b>";
   else
@@ -42,18 +46,33 @@ void reply_state(WiFiClient client,int lamba_durumu, int otomatik) {
     s+= " <b><a href=\"/otomatik/kapat\"\">KAPAT</a></b>";
   else
     s+= " <b><a href=\"/otomatik/ac\"\">AC</a></b>";
-  
-  
-  
   s+="</html></font>";
-  
-  Serial.println(lamba_durumu);
+  Serial.print("    " + lamba_);
   client.print(s);
   client.flush();
-  delay(1);
 }
 
+String check_automatic_time(){
+  timeClient.update();
+  String current_time = timeClient.getFormattedTime();
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http; 
+    http.begin("http://api.sunrise-sunset.org/json?lat=39.921329648&lng=32.884663128&date=today&formatted=0"); // Ankara
+    int httpCode = http.GET();
+    String http1 = http.getString();
+    deserializeJson(doc, http1);                                      
+    if (httpCode > 0) {
 
+      JsonObject results = doc["results"];
+      String results_sunset = results["astronomical_twilight_end"];
+      String sunset_time = results_sunset.substring(results_sunset.indexOf('T')+1,results_sunset.indexOf('+'));
+      return sunset_time;
+    }
+    http.end(); 
+  }
+
+}
+String sunset_time = "18:00:00";
 
 void setup() {
   Serial.begin(115200);
@@ -78,44 +97,28 @@ void setup() {
   Serial.println(WiFi.localIP());
   server.begin();
   timeClient.begin();
+  sunset_time = check_automatic_time();
 
 }
-const long interval =  2000; 
+const long interval = 1000 * 60 * 60 * 24; // Günde 1 defa
 unsigned long previousMillis = 0;   
 
-const size_t capacity = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(10) + 621;
-DynamicJsonDocument doc(capacity);
 
-void loop(){
 
+void loop(){ 
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
+    sunset_time = check_automatic_time();
     previousMillis = currentMillis;
-    timeClient.update();
-    String current_time = timeClient.getFormattedTime();
-    if (WiFi.status() == WL_CONNECTED) {
-      HTTPClient http; 
-      http.begin("http://api.sunrise-sunset.org/json?lat=39.921329648&lng=32.884663128&date=today&formatted=0"); // Ankara
-      int httpCode = http.GET();
-      String http1 = http.getString();
-      deserializeJson(doc, http1);                                      
-      if (httpCode > 0) {
-  
-        JsonObject results = doc["results"];
-        String results_sunset = results["astronomical_twilight_end"];
-        String sunset_time = results_sunset.substring(results_sunset.indexOf('T')+1,results_sunset.indexOf('+'));
-
-        if(otomatik==HIGH && lamba_durumu == LOW && sunset_time < current_time){
-          lamba_durumu = HIGH;
-          digitalWrite(lamba, LOW);
-        }
-      }
-      http.end(); 
-    }
   }
-
+  timeClient.update();
+  String current_time = timeClient.getFormattedTime();
+  delay(2000);
+  if(otomatik==HIGH && lamba_durumu == LOW && sunset_time < current_time){
+    lamba_durumu = HIGH;
+    digitalWrite(lamba, LOW);
+  }
   WiFiClient client = server.available();   
-
   if(client.available()){
     String request = client.readStringUntil('\r');
     Serial.println(request);
@@ -124,18 +127,19 @@ void loop(){
       digitalWrite(lamba, LOW);
       lamba_durumu = HIGH;
     }
-    
     if (request.indexOf("/lamba/kapat") != -1)  {
       digitalWrite(lamba, HIGH);
       lamba_durumu = LOW;
+      if(otomatik == HIGH && sunset_time < current_time)
+        otomatik = LOW;
     }
-    
-    int otomatik = LOW;
     if (request.indexOf("/otomatik/ac") != -1)
       otomatik = HIGH;
     if (request.indexOf("/otomatik/kapat") != -1)
       otomatik = LOW;
-     reply_state(client,lamba_durumu,otomatik);
+    
+    reply_state(client,lamba_durumu,otomatik);
     }
+    
 }
 
