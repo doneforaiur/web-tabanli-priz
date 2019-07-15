@@ -19,6 +19,8 @@ DynamicJsonDocument doc(capacity);
 String header; // HTTP isteğini saklamak için
 int lamba_durumu = LOW;
 int otomatik = HIGH;
+int alarm = HIGH;
+String alarm_time = "07:00:00";
 WiFiUDP ntpUDP;
 
 const long utcOffsetInSeconds = 10800;
@@ -28,26 +30,35 @@ WiFiServer server(8080);
 // 80 portu Skype gibi uygulamalar tarafından kullanıldığı için
 // hata alırsanız 8080 portunu deneyebilirsiniz.
 
-void reply_state(WiFiClient client, int lamba_durumu, int otomatik, String sunset_time) {
+void reply_state(WiFiClient client, int lamba_durumu, int otomatik, String sunset_time,int alarm ,String alarm_time) {
 
   String lamba_;
   String otomatik_;
+  String alarm_;
   lamba_ = (lamba_durumu == 1) ? "acik" : "kapali";
   otomatik_ = (otomatik == 1) ? "acik" : "kapali";
+  alarm_ = (alarm == 1) ? "acik" : "kapali";
 
   String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnnection: close\r\n\r\n<!DOCTYPE HTML><html>";
   s += "<link rel=\"icon\" href=\"data:,\">"; // Gereksiz GET favicon.ico isteklerini engellemek için
-  s += "<center><font size=\"8\">Lamba suan; " + lamba_;
+  s += "<br><center><font size=\"8\">Lamba suan; " + lamba_;
   if (lamba_ == "acik")
     s += " <b><a href=\"/lamba/kapat\"\">KAPAT</a></b>";
   else
     s += " <b><a href=\"/lamba/ac\"\">AC</a></b>";
-  s += "<br>Otomatik suan; " + otomatik_;
+    
+  s += "<br><br>Alarm suan; " + alarm_;
+  if (alarm_ == "acik")
+    s += " <b><a href=\"/alarm/kapat\"\">KAPAT</a></b>";
+  else
+    s += " <b><a href=\"/alarm/ac\"\">AC</a></b>";
+
+  s += "<br><br>Otomatik suan; " + otomatik_;
   if (otomatik_ == "acik")
     s += " <b><a href=\"/otomatik/kapat\"\">KAPAT</a></b>";
   else
     s += " <b><a href=\"/otomatik/ac\"\">AC</a></b>";
-  s += "<br>Gunes batis saati; " + sunset_time + "</html></font>";
+  s += "<br><br><br><br>Gunes batis saati; " + sunset_time + "<br>Alarm saati; "+ alarm_time +"</html></font>";
   Serial.print("    " + lamba_);
   client.print(s);
   client.flush();
@@ -126,12 +137,17 @@ void loop() {
     sunset_time = check_automatic_time();
     previousMillis = currentMillis;
   }
+  delay(500);
   timeClient.update();
   String current_time = timeClient.getFormattedTime();
-  delay(1000);
   if (otomatik == HIGH && lamba_durumu == LOW && sunset_time < current_time) {
     lamba_durumu = HIGH;
     digitalWrite(lamba, LOW);
+  }
+  if(lamba_durumu == LOW && alarm == HIGH && current_time > alarm_time){
+    lamba_durumu = HIGH;
+    alarm = LOW;
+    digitalWrite(lamba,LOW);
   }
   WiFiClient client = server.available();
   if (client.available()) {
@@ -147,12 +163,18 @@ void loop() {
       lamba_durumu = LOW;
       if (otomatik == HIGH && sunset_time < current_time)
         otomatik = LOW;
+      if (alarm == HIGH && alarm_time < current_time)
+        alarm = LOW;
     }
     if (request.indexOf("/otomatik/ac") != -1)
       otomatik = HIGH;
     if (request.indexOf("/otomatik/kapat") != -1)
       otomatik = LOW;
-
-    reply_state(client, lamba_durumu, otomatik, sunset_time);
+    if (request.indexOf("/alarm/ac") != -1)
+      alarm = HIGH;
+    if (request.indexOf("/alarm/kapat") != -1)
+      alarm = LOW;
+      
+    reply_state(client, lamba_durumu, otomatik, sunset_time, alarm, alarm_time);
   }
 }
