@@ -10,8 +10,8 @@
 
 #define lamba 14
 
-const char* wifi_ad = "*****";   // Wifi adı ve şifresini
-const char* wifi_sifre = "*****"; // değiştiriniz.
+const char* wifi_ad = "*******";   // Wifi adı ve şifresini
+const char* wifi_sifre = "*******"; // değiştiriniz.
 
 const size_t capacity = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(10) + 621;
 DynamicJsonDocument doc(capacity);
@@ -40,6 +40,23 @@ void reply_state(WiFiClient client, int lamba_durumu, int otomatik, String sunse
   alarm_ = (alarm == 1) ? "acik" : "kapali";
 
   String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnnection: close\r\n\r\n<!DOCTYPE HTML><html>";
+  s += "<style type=\"text/javascript\">"
+  "var slider = document.getElementById(\"alarmTime\");"
+  "var output = document.getElementById(\"aTime\");"
+  "output.innerHTML = slider.value;"
+  "slider.oninput = function() {"
+    "output.innerHTML = this.value;"
+    "sendSlider(this.id, this.value);"
+  "}"
+
+  "function sendSlider(slider, value){"
+  "  var xhr = new XMLHttpRequest();"
+  "  var url = \"/\" + slider + \"=\" + value;"
+  "  xhr.open(\"GET\", url, true);"
+  "  xhr.send();"
+  "}"
+  "</style>";
+  s+="<body>";
   s += "<link rel=\"icon\" href=\"data:,\">"; // Gereksiz GET favicon.ico isteklerini engellemek için
   s += "<br><center><font size=\"8\">Lamba suan; " + lamba_;
   if (lamba_ == "acik")
@@ -58,7 +75,12 @@ void reply_state(WiFiClient client, int lamba_durumu, int otomatik, String sunse
     s += " <b><a href=\"/otomatik/kapat\"\">KAPAT</a></b>";
   else
     s += " <b><a href=\"/otomatik/ac\"\">AC</a></b>";
-  s += "<br><br><br><br>Gunes batis saati; " + sunset_time + "<br>Alarm saati; "+ alarm_time +"</html></font>";
+
+  s+="<br><br><form action=\"/alarm_set\">"
+  "Alarm saati; <input type=\"range\" name=\"alarmTime\" min=\"6\" max=\"9\">"
+  "<input type=\"submit\">"
+  "</form>";
+  s += "<br><br><br><br>Gunes batis saati; " + sunset_time + "<br>Alarm saati; "+ alarm_time +"</body></html></font>";
   Serial.print("    " + lamba_);
   client.print(s);
   client.flush();
@@ -86,9 +108,8 @@ String check_automatic_time() {
 String sunset_time = "18:00:00";
 
 
+
 //######################
-
-
 
 void setup() {
   Serial.begin(115200);
@@ -109,7 +130,7 @@ void setup() {
   // internet erişimi olan her yerden bağlanabilirsiniz.
 
   Serial.println(WiFi.localIP());
-  server.begin();
+  server.begin();   
   timeClient.begin();
   sunset_time = check_automatic_time();
   ArduinoOTA.setHostname("nodemcu-v3");
@@ -130,6 +151,7 @@ void setup() {
 const long interval = 1000 * 60 * 60 * 24; // Günde 1 defa
 unsigned long previousMillis = 0;
 
+
 //############################
 
 
@@ -143,6 +165,7 @@ void loop() {
   delay(500);
   timeClient.update();
   String current_time = timeClient.getFormattedTime();
+
   if (otomatik == HIGH && lamba_durumu == LOW && sunset_time < current_time) {
     lamba_durumu = HIGH;
     digitalWrite(lamba, LOW);
@@ -158,6 +181,12 @@ void loop() {
     String request = client.readStringUntil('\r');
     Serial.println(request);
     client.flush();
+    if(request.indexOf("alarmTime")!=-1){
+    int index = request.indexOf("alarmTime");
+    char aTime = request[index+10];
+    //sprintf(aTime, "%i", index);
+    alarm_time[1] = aTime;
+    }
     if (request.indexOf("/lamba/ac") != -1)  {
       digitalWrite(lamba, LOW);
       lamba_durumu = HIGH;
