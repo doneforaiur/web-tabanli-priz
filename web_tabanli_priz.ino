@@ -10,8 +10,8 @@
 
 #define lamba 14
 
-const char* wifi_ad = "******";   // Wifi adı ve şifresini
-const char* wifi_sifre = "******"; // değiştiriniz.
+const char* wifi_ad = "*****";   // Wifi adı ve şifresini
+const char* wifi_sifre = "*****"; // değiştiriniz.
 
 const size_t capacity = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(10) + 621;
 DynamicJsonDocument doc(capacity);
@@ -20,13 +20,13 @@ String header; // HTTP isteğini saklamak için
 int lamba_durumu = LOW;
 int otomatik = HIGH;
 int alarm = HIGH;
-String alarm_time = "07:00:00";
+String alarm_time = "06:00:00";
 WiFiUDP ntpUDP;
 
 const long utcOffsetInSeconds = 10800;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
-WiFiServer server(8080);
+WiFiServer server(80);
 // 80 portu Skype gibi uygulamalar tarafından kullanıldığı için
 // hata alırsanız 8080 portunu deneyebilirsiniz.
 
@@ -74,7 +74,6 @@ String check_automatic_time() {
     String http1 = http.getString();
     deserializeJson(doc, http1);
     if (httpCode > 0) {
-
       JsonObject results = doc["results"];
       String results_sunset = results["astronomical_twilight_end"];
       String sunset_time = results_sunset.substring(results_sunset.indexOf('T') + 1, results_sunset.indexOf('+'));
@@ -86,14 +85,17 @@ String check_automatic_time() {
 
 String sunset_time = "18:00:00";
 
+
+//######################
+
+
+
 void setup() {
   Serial.begin(115200);
   pinMode(lamba, OUTPUT);
   digitalWrite(lamba, HIGH);
-
   Serial.print(wifi_ad);
   Serial.println("'na bağlanılıyor.");
-
   WiFi.begin(wifi_ad, wifi_sifre);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -128,6 +130,7 @@ void setup() {
 const long interval = 1000 * 60 * 60 * 24; // Günde 1 defa
 unsigned long previousMillis = 0;
 
+//############################
 
 
 void loop() {
@@ -144,7 +147,8 @@ void loop() {
     lamba_durumu = HIGH;
     digitalWrite(lamba, LOW);
   }
-  if(lamba_durumu == LOW && alarm == HIGH && current_time > alarm_time){
+
+  if(lamba_durumu == LOW && alarm == HIGH && current_time > alarm_time && current_time < sunset_time){
     lamba_durumu = HIGH;
     alarm = LOW;
     digitalWrite(lamba,LOW);
@@ -163,7 +167,7 @@ void loop() {
       lamba_durumu = LOW;
       if (otomatik == HIGH && sunset_time < current_time)
         otomatik = LOW;
-      if (alarm == HIGH && alarm_time < current_time)
+      if (alarm == HIGH && alarm_time < current_time && current_time < sunset_time)
         alarm = LOW;
     }
     if (request.indexOf("/otomatik/ac") != -1)
