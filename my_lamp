@@ -1,0 +1,8 @@
+#!/bin/bash
+# Controlling my lamp...
+
+if curl -s 192.168.1.103 | grep -q "Lamba suan; acik"; then
+	curl -s 192.168.1.103/lamba/kapat
+else
+	curl -s 192.168.1.103/lamba/ac
+fi
